@@ -1,0 +1,35 @@
+pragma circom 2.0.0;
+
+// Import the Poseidon Hash function from the standard library
+include node_modules/circomlib/circuits/poseidon.circom;
+
+template SovereignVeto() {
+    // --- INPUTS ---
+    // The Auditor's secret 5th Key (Keep this Private!)
+    signal input auditor_secret;
+    // The current Veto Session (Public, so everyone knows what we are voting on)
+    signal input session_id; 
+
+    // --- OUTPUTS ---
+    // The public stamp to prove they are a valid auditor
+    signal output identity_commitment; 
+    // The public stamp to prevent double-voting
+    signal output nullifier_hash; 
+
+    // --- LOGIC 1: Prove Identity ---
+    // We hash the secret key. The database will check if this hash is on the VIP list.
+    component idHasher = Poseidon(1);
+    idHasher.inputs[0] <== auditor_secret;
+    identity_commitment <== idHasher.out;
+
+    // --- LOGIC 2: Prevent Sybil Attacks (Double Voting) ---
+    // We hash the secret key COMBINED with the session ID. 
+    // This creates a unique stamp that can only be used once per session.
+    component nullifierHasher = Poseidon(2);
+    nullifierHasher.inputs[0] <== auditor_secret;
+    nullifierHasher.inputs[1] <== session_id;
+    nullifier_hash <== nullifierHasher.out;
+}
+
+// This tells the compiler which template to use and which inputs MUST stay private
+component main {public [session_id]} = SovereignVeto();

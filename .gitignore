@@ -1,0 +1,11 @@
+# Security
+node_modules/
+target/
+.anchor/
+.env
+*.json
+!idl/*.json
+
+# Solana Keys (DO NOT REMOVE)
+/test-ledger/
+id.json
