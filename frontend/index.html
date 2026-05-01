@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>$SICAT | Sentry Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); border: 1px solid #334155; backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="min-h-screen p-8">
+
+    <header class="flex justify-between items-center mb-12 border-b border-gray-700 pb-6">
+        <div>
+            <h1 class="text-4xl font-extrabold tracking-tight text-white">$SICAT <span class="text-emerald-500">LUMINA</span></h1>
+            <p class="text-gray-400 mt-1 mono text-sm">SOVEREIGN INTERSECTIONAL AI TRUST // DEVNET LIVE</p>
+        </div>
+        <div class="text-right glass-panel px-6 py-3 rounded-lg">
+            <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Global South Vault</p>
+            <p class="text-2xl font-bold mono text-emerald-400" id="vault-balance">-- SOL</p>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+        <div class="col-span-1 space-y-8">
+            <div class="glass-panel p-6 rounded-xl">
+                <h2 class="text-xl font-bold text-white mb-4">🔎 Audit Verifier</h2>
+                <p class="text-sm text-gray-400 mb-4">Enter a Model Hash to verify its cryptographic audit status.</p>
+                <input type="text" id="hash-input" placeholder="e.g., MODEL_HASH_GAMMA_9" class="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white mono text-sm focus:border-emerald-500 outline-none mb-4">
+                <button class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded transition-colors" onclick="verifyHash()">
+                    SCAN LEDGER
+                </button>
+                
+                <div id="qr-display" class="mt-6 hidden flex flex-col items-center">
+                    <div class="w-48 h-48 bg-white rounded flex items-center justify-center text-gray-900 font-bold mono">
+                        [QR CODE]
+                    </div>
+                    <p class="text-xs text-gray-400 mt-3 text-center" id="qr-status"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-span-2 glass-panel p-6 rounded-xl flex flex-col h-[500px]">
+            <h2 class="text-xl font-bold text-white mb-6">📡 Live Sentry Feed</h2>
+            
+            <div class="overflow-y-auto flex-grow pr-2 space-y-4" id="ledger-feed">
+                </div>
+                        <p class="mono text-sm text-gray-300">HASH: MODEL_HASH_GAMMA_9</p>
+                        <p class="text-xs text-red-400 font-bold mt-1">🚩 SLASHED - METADATA: GENDER, RACE</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm mono text-gray-400">Proposal #403</p>
+                        <p class="text-xs text-gray-500 mt-1">2 mins ago</p>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-gray-800 rounded border-l-4 border-emerald-500 flex justify-between items-center">
+                    <div>
+                        <p class="mono text-sm text-gray-300">HASH: MODEL_HASH_BETA_2</p>
+                        <p class="text-xs text-emerald-400 font-bold mt-1">✅ CERTIFIED - METADATA: NONE</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm mono text-gray-400">Proposal #402</p>
+                        <p class="text-xs text-gray-500 mt-1">1 hr ago</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    
+  <script>
+        // --- 1. PROTOCOL CONFIGURATION ---
+        // We use the global solanaWeb3 object provided by the CDN
+        const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+        
+        // ⚠️ UPDATE THESE TWO VARIABLES ⚠️
+        const PROGRAM_ID = new solanaWeb3.PublicKey("F5K84FMkCoSMpNP967fwAh7ZijrdNtMKv5dwzjaxcuPY"); 
+        const VAULT_ADDRESS = new solanaWeb3.PublicKey("Hr1QNASfMxV2J3gKnHqDM7t1Lce4p2tRh9WjxabgXrZa"); 
+
+        // --- 2. FETCH VAULT BALANCE ---
+        async function updateVaultBalance() {
+            try {
+                const balance = await connection.getBalance(VAULT_ADDRESS);
+                const solBalance = (balance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
+                document.getElementById('vault-balance').innerText = `${solBalance} SOL`;
+            } catch (err) {
+                console.error("Vault fetch error:", err);
+                document.getElementById('vault-balance').innerText = "ERR SOL";
+            }
+        }
+
+        // --- 3. VERIFY HASH (THE SNIPER LOGIC) ---
+        async function verifyHash() {
+            const input = document.getElementById('hash-input').value.trim();
+            const qrDisplay = document.getElementById('qr-display');
+            const qrStatus = document.getElementById('qr-status');
+            
+            if(!input) return;
+
+            qrDisplay.classList.remove('hidden');
+            qrStatus.innerText = `Scanning global ledger for ${input}...`;
+
+            try {
+                // Fetch recent interactions with your Smart Contract
+                const signatures = await connection.getSignaturesForAddress(PROGRAM_ID, { limit: 50 });
+                let foundSignature = null;
+
+                // Loop through transactions to find the specific Hash
+                for (let sigInfo of signatures) {
+                    const tx = await connection.getTransaction(sigInfo.signature, { maxSupportedTransactionVersion: 0 });
+                    if (tx && tx.meta && tx.meta.logMessages) {
+                        const logs = tx.meta.logMessages.join(" ");
+                        if (logs.includes(input)) {
+                            foundSignature = sigInfo.signature;
+                            break;
+                        }
+                    }
+                }
+       
+        // --- 4. LOAD LIVE SENTRY FEED ---
+        async function loadLiveFeed() {
+            const feedContainer = document.getElementById('ledger-feed');
+            feedContainer.innerHTML = '<p class="text-sm text-gray-500 text-center mt-10 animate-pulse">Fetching global state...</p>';
+
+            try {
+                // Grab the last 5 transactions for the $SICAT protocol
+                const signatures = await connection.getSignaturesForAddress(PROGRAM_ID, { limit: 20 });
+                feedContainer.innerHTML = ''; // Clear loading message
+
+                for (let sigInfo of signatures) {
+                    // Fetch the full transaction data to read the logs
+                    const tx = await connection.getTransaction(sigInfo.signature, { maxSupportedTransactionVersion: 0 });
+                    if (!tx || !tx.meta || !tx.meta.logMessages) continue;
+
+                    const logs = tx.meta.logMessages.join(" ");
+                    
+                    // Only process logs that contain our Sentry Engine metadata
+                    if (logs.includes("HASH:")) {
+                        // Extract the Hash using a simple Regular Expression
+                        const hashMatch = logs.match(/HASH:\s*([A-Za-z0-9_]+)/);
+                        const hash = hashMatch ? hashMatch[1] : "UNKNOWN_HASH";
+
+                        // NEW: Extract the IPFS CID
+                        const cidMatch = logs.match(/CID:\s*([a-zA-Z0-9]+)/);
+                        const cid = cidMatch ? cidMatch[1] : null;
+
+                        // Determine if it was Certified or Slashed based on our Rust logic
+                        let status = "UNKNOWN";
+                        let colorClass = "border-gray-500";
+                        let textClass = "text-gray-400";
+
+                        if (logs.includes("NONE")) {
+                            status = "✅ CERTIFIED - THRESHOLD CLEAR";
+                            colorClass = "border-emerald-500";
+                            textClass = "text-emerald-400";
+                        } else {
+                            status = "🚩 SLASHED - SEVERITY MET";
+                            colorClass = "border-red-500";
+                            textClass = "text-red-400";
+                        }
+
+                        // Calculate how long ago the audit happened
+                        const timeAgo = Math.floor((Date.now() / 1000) - sigInfo.blockTime);
+                        const timeString = timeAgo < 60 ? `${timeAgo} sec ago` : `${Math.floor(timeAgo/60)} mins ago`;
+
+                        // Build the UI Row
+                        const row = `
+                        <div class="p-4 bg-gray-800 rounded border-l-4 ${colorClass} flex justify-between items-center hover:bg-gray-700 transition-colors cursor-pointer" onclick="window.open('https://explorer.solana.com/tx/${sigInfo.signature}?cluster=devnet', '_blank')">
+                            <div>
+                                <p class="mono text-sm text-gray-300">HASH: ${hash}</p>
+                                <p class="text-xs ${textClass} font-bold mt-1">${status}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[10px] mono text-gray-500 mb-1" title="${sigInfo.signature}">TX: ${sigInfo.signature.substring(0,8)}...</p>
+                                ${cid ? `<a href="https://gateway.pinata.cloud/ipfs/${cid}" target="_blank" class="text-xs font-bold text-blue-400 hover:text-blue-300 mb-1 flex items-center">📄 View Raw Audit</a>` : ''}
+                                <p class="text-xs text-gray-500">${timeString}</p>
+                            </div>
+                        </div>
+                        `;
+                        feedContainer.innerHTML += row;
+                    }
+                }
+
+                if(feedContainer.innerHTML === '') {
+                    feedContainer.innerHTML = '<p class="text-sm text-gray-500 text-center mt-10">No recent audits found.</p>';
+                }
+
+            } catch (err) {
+                console.error("Live feed error:", err);
+                feedContainer.innerHTML = '<p class="text-sm text-red-500 text-center mt-10">Network error loading feed.</p>';
+            }
+        } 
+           
+                if (foundSignature) {
+                    const explorerUrl = `https://explorer.solana.com/tx/${foundSignature}?cluster=devnet`;
+                    // Use a free API to generate the QR code image
+                    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(explorerUrl)}`;
+                    
+                    qrDisplay.innerHTML = `
+                        <img src="${qrCodeUrl}" alt="QR Code" class="w-48 h-48 rounded shadow-lg border-2 border-emerald-500">
+                        <p class="text-xs text-emerald-400 mt-3 font-bold text-center">✅ AUDIT FOUND ON DEVNET</p>
+                        <a href="${explorerUrl}" target="_blank" class="text-[10px] text-gray-400 hover:text-white underline mt-1 break-all text-center">View raw transaction</a>
+                    `;
+                } else {
+                    qrDisplay.innerHTML = `
+                        <div class="w-48 h-48 bg-gray-800 rounded flex items-center justify-center border-2 border-red-500 text-red-500 text-4xl">❌</div>
+                        <p class="text-xs text-red-400 mt-3 font-bold text-center">HASH NOT FOUND ON LEDGER</p>
+                    `;
+                }
+            } catch (err) {
+                console.error(err);
+                qrStatus.innerText = "Network error connecting to Devnet.";
+            }
+        }
+
+        // Initialize Dashboard on load
+        window.onload = () => {
+            updateVaultBalance();
+            loadLiveFeed();
+        };
+    </script>
+</body>
+</html>
